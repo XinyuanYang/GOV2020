@@ -1,0 +1,376 @@
+---
+title: "Replication Material"
+author: "Xinyuan Yang"
+date: "2024-11-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+library(tidyverse)
+library(rdrobust)
+library(rdlocrand)
+library(rddensity)
+library(foreign)
+library(stargazer)
+library(lfe)
+library(janitor)
+library(xtable)
+
+## functions to convert rd.robust output for figures/tables:
+source("rd.export.R")
+
+# lead and lag functions that account for missing years
+lag.new <- function(x, n = 1L, along_with){
+  index <- match(along_with - n, along_with, incomparable = NA)
+  out <- x[index]
+  attributes(out) <- attributes(x)
+  out
+}
+
+lead.new <- function(x, n = 1L, along_with){
+  index <- match(along_with + n, along_with, incomparable = NA)
+  out <- x[index]
+  attributes(out) <- attributes(x)
+  out
+}
+## for weighted RD plots:
+tri <- function (x, h, c=0) pmax(0, 1 - abs((x - c) / h))
+
+## custom colors:
+vpurple = "#440154FF"
+vyellow = "#FDE725FF"
+vgreen = "#21908CFF"
+
+
+## ------------------ ##
+## Read data -------------------------------------------------------------------
+## ------------------ ##
+data_2p <- read_rds(file = "data_mayors_2p_post1990.rds")
+
+data_2p <- data_2p %>%
+  rowwise() %>%
+  mutate(
+    total_units_lead23avg = mean(c(total_units_lead2, total_units_lead3), na.rm=T),
+    total_units_multi_ln_lead23avg = mean(c(total_units_multi_ln_lead2, total_units_multi_ln_lead3), na.rm=T),
+    total_units_multi_pc_lead23avg = mean(c(total_units_multi_pc_lead2, total_units_multi_pc_lead3), na.rm=T)
+  )
+
+```
+
+#### by Local Council Approval Power ####
+
+```{r}
+fit_approval_units_delta23avg <- with(filter(data_2p,council_approval_norez==1),
+                                      rdrobust(y = total_units_ln_delta23avg,x = demshare,
+                                               c = 0.5,cluster = cluster
+                                      ))
+fit_approval_bldgs_delta23avg <- with(filter(data_2p,council_approval_norez==1),
+                                      rdrobust(y = total_bldgs_ln_delta23avg,x = demshare,
+                                               c = 0.5,cluster = cluster
+                                      ))
+
+fit_approval_units_multi_delta23avg <- with(filter(data_2p,council_approval_norez==1),
+                                            rdrobust(y = total_units_multi_ln_delta23avg,x = demshare,
+                                                     c = 0.5,cluster = cluster
+                                            ))
+fit_approval_bldgs_multi_delta23avg <- with(filter(data_2p,council_approval_norez==1),
+                                            rdrobust(y = total_bldgs_multi_ln_delta23avg,x = demshare,
+                                                     c = 0.5,cluster = cluster
+                                            ))
+fit_approval_units_single_delta23avg <- with(filter(data_2p,council_approval_norez==1),
+                                            rdrobust(y = total_units_single_ln_delta23avg,x = demshare,
+                                                     c = 0.5,cluster = cluster
+                                            ))
+fit_approval_bldgs_single_delta23avg <- with(filter(data_2p,council_approval_norez==1),
+                                            rdrobust(y = total_bldgs_single_ln_delta23avg,x = demshare,
+                                                     c = 0.5,cluster = cluster
+                                            ))
+fit_approval_ratio_bldgs_multisingle_delta23avg <- with(filter(data_2p,council_approval_norez==1),
+                                                        rdrobust(y = ratio_bldgs_multisingle_delta23avg,x = demshare,
+                                                                 c = 0.5,cluster = cluster
+                                                        ))
+
+fit_approval_ratio_units_multisingle_delta23avg <- with(filter(data_2p,council_approval_norez==1),
+                                                        rdrobust(y = ratio_units_multisingle_delta23avg,x = demshare,
+                                                                 c = 0.5, cluster = cluster
+                                                        ))
+
+fit_noapproval_units_delta23avg <- with(filter(data_2p,council_approval_norez==0),
+                                        rdrobust(y = total_units_ln_delta23avg,x = demshare,
+                                                 c = 0.5,cluster = cluster
+                                        ))
+fit_noapproval_bldgs_delta23avg <- with(filter(data_2p,council_approval_norez==0),
+                                        rdrobust(y = total_bldgs_ln_delta23avg,x = demshare,
+                                                 c = 0.5,cluster = cluster
+                                        ))
+
+fit_noapproval_units_multi_delta23avg <- with(filter(data_2p,council_approval_norez==0),
+                                              rdrobust(y = total_units_multi_ln_delta23avg,x = demshare,
+                                                       c = 0.5,cluster = cluster
+                                              ))
+fit_noapproval_bldgs_multi_delta23avg <- with(filter(data_2p,council_approval_norez==0),
+                                              rdrobust(y = total_bldgs_multi_ln_delta23avg,x = demshare,
+                                                       c = 0.5,cluster = cluster
+                                              ))
+fit_noapproval_units_single_delta23avg <- with(filter(data_2p,council_approval_norez==0),
+                                              rdrobust(y = total_units_single_ln_delta23avg,x = demshare,
+                                                       c = 0.5,cluster = cluster
+                                              ))
+fit_noapproval_bldgs_single_delta23avg <- with(filter(data_2p,council_approval_norez==0),
+                                              rdrobust(y = total_bldgs_single_ln_delta23avg,x = demshare,
+                                                       c = 0.5,cluster = cluster
+                                              ))
+fit_noapproval_ratio_bldgs_multisingle_delta23avg <- with(filter(data_2p,council_approval_norez==0),
+                                                          rdrobust(y = ratio_bldgs_multisingle_delta23avg,x = demshare,
+                                                                   c = 0.5,cluster = cluster
+                                                          ))
+
+fit_noapproval_ratio_units_multisingle_delta23avg <- with(filter(data_2p,council_approval_norez==0),
+                                                          rdrobust(y = ratio_units_multisingle_delta23avg,x = demshare,
+                                                                   c = 0.5, cluster = cluster
+                                                          ))
+
+# moderation significance check:
+fit_approval_ratio_units_multisingle_delta23avg
+fit_noapproval_ratio_units_multisingle_delta23avg
+(approval_diff <- fit_approval_ratio_units_multisingle_delta23avg$coef[1,1] - fit_noapproval_ratio_units_multisingle_delta23avg$coef[1,1]) # 0.06
+Z_approval = (fit_approval_ratio_units_multisingle_delta23avg$coef[1,1] - fit_noapproval_ratio_units_multisingle_delta23avg$coef[1,1])/
+  sqrt(fit_approval_ratio_units_multisingle_delta23avg$se[3,1]^2 + fit_noapproval_ratio_units_multisingle_delta23avg$se[3,1]^2)
+(Pvalue_approval <- 2*pnorm(-abs(Z_approval))) # 0.58
+
+bin.df <- filter(data_2p) %>%
+  group_by(demshare_bin) %>%
+  summarize(n_total = n(),
+            avg_y = mean(total_units_multi_ln_delta23avg,na.rm=T),
+            mid = first(mid))
+
+pdf("mayors/rdplot_units_multi_ln_delta23avg.pdf",width=5,height=4)
+ggplot(data_2p) +
+  geom_point(data=bin.df,aes(x=mid,y=avg_y, size=n_total),
+             shape=1,col="black") +
+  geom_smooth(data=subset(data_2p,mid<=0.5),
+              aes(x = demshare, y = total_units_multi_ln_delta23avg,
+              weight=tri(demshare, fit_units_multi_delta23avg$bws[1,1],c=0.5)),
+              method = 'lm', formula = y ~ poly(x, 1), size=1.5,col="blue") + 
+  geom_smooth(data=subset(data_2p,mid>0.5),
+              aes(x = demshare, y = total_units_multi_ln_delta23avg,
+              weight=tri(demshare, fit_units_multi_delta23avg$bws[1,1],c=0.5)),
+              method = 'lm', formula = y ~ poly(x, 1), size=1.5,col="blue") + 
+  annotate('text', x = .51, y = 1.5, 0.05, hjust=0, parse=TRUE,
+           label = paste('hat(tau)==',
+                         round(fit_units_multi_delta23avg$coef['Conventional', ], 2),
+                         '~(list(', round(fit_units_multi_delta23avg$ci['Robust', 1], 2),
+                         ',', round(fit_units_multi_delta23avg$ci['Robust', 2], 2),
+                         '))')) + 
+  theme_minimal() + 
+  scale_x_continuous("Mayoral Democratic voteshare",
+                     limits=c(0.5-fit_units_multi_delta23avg$bws[1,1],
+                              0.5+fit_units_multi_delta23avg$bws[1,1])) + 
+  scale_y_continuous(str_wrap("Change in log(multi-family units + 1)",40)) +
+  scale_size_continuous("Number of\nelections in bin") + 
+  coord_cartesian(ylim=c(-1.5,2.25),xlim=c(0.39,0.61)) 
+  #theme(legend.pos="bottom",axis.line = element_line(),axis.ticks = element_line(),panel.grid = element_blank())
+dev.off()
+```
+
+
+#### by Local Council Approval Power ####
+```{r}
+#### by Local Council Approval Power ####
+
+## Figure 7b ##
+coefs <- rd.export.numeric.90(list(
+  fit_approval_ratio_bldgs_multisingle_delta23avg,
+  fit_approval_ratio_units_multisingle_delta23avg,
+  fit_noapproval_ratio_bldgs_multisingle_delta23avg,
+  fit_noapproval_ratio_units_multisingle_delta23avg
+)) %>%
+  mutate(approval = c(rep("Yes",2),rep("No",2)))
+
+coefs$outcome_pretty = rep(c("Multi-family proportion\nof total buildings",
+                             "Multi-family proportion\nof total units"), 2)
+coefs <- coefs %>%
+  mutate(plotorder = c(2:1,2:1))
+
+
+pdf("mayors/coefplot_cbps_deltaratios_byapproval_color.pdf",height=3,width=5)
+ggplot(coefs,aes(group=approval)) +
+  geom_hline(yintercept=0, lty=2, lwd=1, colour="grey50") +
+  geom_errorbar(aes(x=plotorder,ymin=cilo, ymax=cihi,col=approval),position=position_dodge(width=0.6), width=0, size=0.75) +
+  geom_errorbar(aes(x=plotorder,ymin=cilo_90, ymax=cihi_90,col=approval),position=position_dodge(width=0.6), width=0, size=1.5) +
+  geom_point(aes(x=plotorder,y=coef,shape=approval,fill=approval),position=position_dodge(width=0.6),size=4) +
+  geom_text(aes(x=plotorder+0.06,y=coef+0.05,label=round(coef,2)),position=position_dodge(width=0.6), size=3) +
+  annotate(geom="text",x=2.35,y=filter(coefs,approval=="Yes"&outcome=="ratio_bldgs_multisingle_delta23avg")$coef+0.095,label="Requires majority\ncouncil approval",hjust=0,lineheight = .7,size=2.5) + 
+  geom_curve(aes(x = 2.35, y = filter(coefs,approval=="Yes"&outcome=="ratio_bldgs_multisingle_delta23avg")$coef+0.09, xend = 2.2, yend = filter(coefs,approval=="Yes"&outcome=="ratio_bldgs_multisingle_delta23avg")$coef+0.01),arrow = arrow(length = unit(0.03, "npc"),type="closed"), size = 0.5,curvature = 0.25,angle=90) + 
+  annotate(geom="text",x=1.65,y=filter(coefs,approval=="No"&outcome=="ratio_bldgs_multisingle_delta23avg")$coef+0.055,label="Does not require\nmajority council approval",hjust=0,lineheight = .7,size=2.5) + 
+  geom_curve(aes(x = 1.65, y = filter(coefs,approval=="No"&outcome=="ratio_bldgs_multisingle_delta23avg")$coef+0.05, xend = 1.8, yend = filter(coefs,approval=="No"&outcome=="ratio_bldgs_multisingle_delta23avg")$coef+0.01),arrow = arrow(length = unit(0.03, "npc"),type="closed"), size = 0.5,curvature = -0.25,angle=90) + 
+  scale_y_continuous("RD effect of Democratic mayor\non change in outcome",
+                     breaks=seq(-1, 1, 0.1),
+                     limits=c(min(coefs$cilo),
+                              max(coefs$cihi)),
+                     labels=seq(-1, 1, 0.1)) +
+  scale_x_continuous("",
+                     breaks=c(coefs$plotorder),
+                     limits=c(0.7,2.6),
+                     labels=coefs$outcome_pretty,position = "bottom") + 
+  scale_shape_manual("Council approval\nneeded?",values = c(21,22),breaks = c("Yes","No"),labels=c("Requires\nmajority","Does\nnot")) + 
+  scale_color_manual("Council approval\nneeded?",breaks=c("Yes","No"),labels=c("Requires\nmajority","Does\nnot"),values=c(vpurple,vgreen),aesthetics = c("col","fill")) + 
+  coord_flip(xlim=c(0.7,2.35)) + 
+  theme_minimal() + 
+  theme(legend.position = "none",legend.text = element_text(size=6),legend.title = element_text(size=7),legend.justification = "top") + 
+  theme(axis.line = element_line(),axis.ticks = element_line(),panel.grid = element_blank())
+dev.off()
+```
+
+## Regulatory Regime ##
+```{r}
+## Regulatory Regime ##
+coefs <- rd.export.numeric.90(list(fit_approval_bldgs_delta23avg,
+                                   fit_approval_bldgs_single_delta23avg,
+                                   fit_approval_bldgs_multi_delta23avg,
+                                   fit_approval_units_delta23avg,
+                                   fit_approval_units_single_delta23avg,
+                                   fit_approval_units_multi_delta23avg,
+                                   
+                                   fit_noapproval_bldgs_delta23avg,
+                                   fit_noapproval_bldgs_single_delta23avg,
+                                   fit_noapproval_bldgs_multi_delta23avg,
+                                   fit_noapproval_units_delta23avg,
+                                   fit_noapproval_units_single_delta23avg,
+                                   fit_noapproval_units_multi_delta23avg
+)) %>%
+  mutate(approval = c(rep("Yes",6),rep("No",6)))
+
+coefs$outcome_pretty = rep(c("Total\nbuildings",
+                             "Single-family\nbuildings",
+                             "Multi-family\nbuildings",
+                             "Total\nunits",
+                             "Single-family\nunits",
+                             "Multi-family\nunits"),2)
+
+coefs$plotorder <- c(6:1,6:1)
+
+
+pdf("mayors/coefplot_cbps_delta23avg_byapproval_v2_color.pdf",height=5,width=5)
+ggplot(coefs,aes(group=approval)) +
+  geom_hline(yintercept=0, lty=2, lwd=1, colour="grey50") +
+  geom_errorbar(aes(x=plotorder,ymin=cilo, ymax=cihi,col=approval),position=position_dodge(width=0.8), 
+                width=0, size=0.75) +
+  geom_errorbar(aes(x=plotorder,ymin=cilo_90, ymax=cihi_90,col=approval),position=position_dodge(width=0.8),
+                width=0, size=1.5) +
+  geom_point(aes(x=plotorder,y=coef,shape=approval,fill=approval),position=position_dodge(width=0.8),size=4) +
+  geom_text(aes(x=plotorder+0.2,y=coef+0.3,label=round(coef,2)),position=position_dodge(width=0.8), size=3) +
+  scale_y_continuous("RD effect on change in log(outcome + 1) between\nelection year and avg. of 2/3 years after election",
+                     breaks=seq(-1, 2, 0.5),
+                     limits=c(min(coefs$cilo),
+                              max(coefs$cihi)),
+                     labels=seq(-1, 2, 0.5)) +
+  scale_x_continuous("Outcome",
+                     breaks=c(coefs$plotorder),
+                     limits=c(0.7,6.4),
+                     labels=coefs$outcome_pretty,position = "bottom") + 
+  scale_shape_manual("Council approval\nneeded?",values = c(21,22),breaks = c("Yes","No"),labels=c("Requires\nmajority","Does\nnot")) + 
+  scale_color_manual("Council approval\nneeded?",breaks=c("Yes","No"),labels=c("Requires\nmajority","Does\nnot"),values=c(vpurple,vgreen),aesthetics = c("col","fill")) + 
+  coord_flip(ylim=c(-1,2)) + 
+  theme_minimal() + 
+  theme(legend.position="bottom")
+dev.off()
+```
+
+
+### robustness check
+```{r}
+#### McCrary tests ####
+
+# formal McCrary test:
+width <- .005
+data.graph <- data_2p %>%
+  mutate(bin=cut(demshare, breaks=seq(0,1, width))
+  )
+bins <- data.frame(bin = levels(data.graph$bin),
+                   mid = seq(0 + width/2, 1 - width/2, width)
+)
+data.graph <- left_join(data.graph,bins,by="bin")
+
+data.graph.all <- data.graph %>% 
+  select(bin, mid.y, ratio_bldgs_multisingle_delta23avg) %>%
+  group_by(bin,mid.y) %>%
+  summarise(bin.mean = mean(ratio_bldgs_multisingle_delta23avg,na.rm=T),
+            n = sum(!is.na(ratio_bldgs_multisingle_delta23avg))) %>%
+  mutate(mid_adj = mid.y - 0.5)
+
+mc.rd.mayors <- lm(n ~ mid_adj * (mid_adj>=0), data=data.graph.all[which(data.graph.all$mid.y>=(0.5-fit_ratio_bldgs_multisingle_delta23avg$bws["h", "left"]) & data.graph.all$mid.y<=(0.5+fit_ratio_bldgs_multisingle_delta23avg$bws["h", "right"])),])
+summary(mc.rd.mayors)
+
+stargazer(mc.rd.mayors,
+          out = "mayors/mccrary.tex",
+          dep.var.labels = "Number of observations in bin",
+          omit.stat = c("ser","f","adj.rsq"),
+          covariate.labels = c("Voteshare bin","Voteshare $\\ge 0.5$","Voteshare bin $\\times$ Voteshare $\\ge$ 0.5"),
+          float = F)
+
+(mccrary_mayors <- ggplot(data_2p,aes(x=demshare)) +
+    geom_histogram(alpha=0.8,binwidth = 0.005,boundary=0.5) +
+    geom_vline(col="red",lty=2,xintercept = 0.5) +
+    labs(x="Democratic Voteshare",y="Observations") +
+    scale_x_continuous(breaks=seq(0,1,0.02),
+                       limits=c(0.5-fit_ratio_units_multisingle_delta23avg$bws["h", "left"],0.5+fit_ratio_units_multisingle_delta23avg$bws["h", "right"]),
+                       labels=scales::percent_format(accuracy = 1)) +
+    theme(text = element_text(size=20)) + 
+    coord_cartesian(xlim=c(0.4,0.6)) + 
+    theme_minimal()
+)
+
+ggsave(mccrary_mayors,filename = "mayors/mccrary_hist.pdf",height=3,width=4)
+
+
+## Using Cattaneo Jansson and Ma (2019) nonparametric method:
+cjm_mayors <- with(data_2p, rddensity(X=demshare,c=0.5,massPoints = F,h = fit_ratio_units_multisingle_delta23avg$bws["h", "left"]))
+summary(cjm_mayors)
+
+names(cjm_mayors)
+cjm_mayors$hat$diff # density difference on either side of cutoff
+cjm_mayors$test$t_jk # t-stat with SE based on jackknife
+cjm_mayors$test$p_jk # p-value for density test
+cjm_mayors$N$eff_left + cjm_mayors$N$eff_right # effective N
+cjm_mayors$h$left
+cjm_mayors$h$right
+
+## Table A4b:
+density_tab <- data.frame(
+  "t-statistic" = c(cjm_mayors$test$t_jk),
+  "p-value" = c(cjm_mayors$test$p_jk),
+  "Effective N" = c(cjm_mayors$N$eff_left + cjm_mayors$N$eff_right)#,
+  # "Bandwidth" = c(cjm_sler$h$left + cjm_sler$h$right,
+  #                 cjm_ceda$h$left + cjm_ceda$h$right,
+  #                 cjm_mayors$h$left + cjm_mayors$h$right)
+)
+
+print(xtable(density_tab),file = "mayors/rddensity_cjm.tex",floating = F,include.rownames = F)
+
+
+## For RDD Density test using Hartman (2020) method (null hypothesis of difference)
+devtools::source_url("https://github.com/ekhartman/rdd_equivalence/blob/master/RDD_equivalence_functions.R?raw=TRUE")
+fstar_mayors <- cjm_mayors$hat$left/cjm_mayors$hat$right # f-star-hat
+hartman_mayors <- rdd.tost.ratio(estL = cjm_mayors$hat$left, estR = cjm_mayors$hat$right,
+                                 seL = cjm_mayors$sd_jk$left, seR = cjm_mayors$sd_jk$right,
+                                 eps = 1.5,
+                                 alpha = 0.05)
+
+## Table A5b:
+hartman_tab <- data.frame("Observed Ratio" = c(fstar_mayors),
+                          "Equivalence Confidence Interval" = c(paste0("(",round(1/hartman_mayors$inverted,2), ", ",round(hartman_mayors$inverted,2),")")),
+                          "p-value" = c(hartman_mayors$p)
+)
+print(xtable(hartman_tab),file = "mayors/density_hartman.tex",floating = F,include.rownames = F)
+```
