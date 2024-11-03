@@ -1,0 +1,247 @@
+---
+title: "Missing Data analysis"
+author: "Xinyuan Yang"
+date: "2024-11-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+library(tidyverse)
+library(rdrobust)
+library(rdlocrand)
+library(rddensity)
+library(foreign)
+library(stargazer)
+library(lfe)
+library(janitor)
+library(xtable)
+
+## functions to convert rd.robust output for figures/tables:
+source("rd.export.R")
+
+# lead and lag functions that account for missing years
+lag.new <- function(x, n = 1L, along_with){
+  index <- match(along_with - n, along_with, incomparable = NA)
+  out <- x[index]
+  attributes(out) <- attributes(x)
+  out
+}
+
+lead.new <- function(x, n = 1L, along_with){
+  index <- match(along_with + n, along_with, incomparable = NA)
+  out <- x[index]
+  attributes(out) <- attributes(x)
+  out
+}
+## for weighted RD plots:
+tri <- function (x, h, c=0) pmax(0, 1 - abs((x - c) / h))
+
+## custom colors:
+vpurple = "#440154FF"
+vyellow = "#FDE725FF"
+vgreen = "#21908CFF"
+
+
+## ------------------ ##
+## Read data -------------------------------------------------------------------
+## ------------------ ##
+data_2p <- read_rds(file = "data_mayors_2p_post1990.rds")
+
+data_2p <- data_2p %>%
+  rowwise() %>%
+  mutate(
+    total_units_lead23avg = mean(c(total_units_lead2, total_units_lead3), na.rm=T),
+    total_units_multi_ln_lead23avg = mean(c(total_units_multi_ln_lead2, total_units_multi_ln_lead3), na.rm=T),
+    total_units_multi_pc_lead23avg = mean(c(total_units_multi_pc_lead2, total_units_multi_pc_lead3), na.rm=T)
+  )
+
+```
+##without missing data##
+
+```{r}
+fit_missingapproval_units_delta23avg <- with(filter(data_2p,is.na(council_approval_norez)),
+                                             rdrobust(y = total_units_ln_delta23avg,x = demshare,
+                                                      c = 0.5,cluster = cluster
+                                                      #, weights=weight
+                                             ))
+fit_missingapproval_bldgs_delta23avg <- with(filter(data_2p,is.na(council_approval_norez)),
+                                             rdrobust(y = total_bldgs_ln_delta23avg,x = demshare,
+                                                      c = 0.5,cluster = cluster
+                                                      #,weights=weight
+                                             ))
+
+fit_missingapproval_units_multi_delta23avg <- with(filter(data_2p,is.na(council_approval_norez)),
+                                                   rdrobust(y = total_units_multi_ln_delta23avg,x = demshare,
+                                                            c = 0.5,cluster = cluster
+                                                            # ,weights=weight
+                                                   ))
+fit_missingapproval_bldgs_multi_delta23avg <- with(filter(data_2p,is.na(council_approval_norez)),
+                                                   rdrobust(y = total_bldgs_multi_ln_delta23avg,x = demshare,
+                                                            c = 0.5,cluster = cluster
+                                                            # ,weights=weight
+                                                   ))
+fit_missingapproval_units_single_delta23avg <- with(filter(data_2p,is.na(council_approval_norez)),
+                                                    rdrobust(y = total_units_single_ln_delta23avg,x = demshare,
+                                                             c = 0.5,cluster = cluster
+                                                             # ,weights=weight
+                                                    ))
+fit_missingapproval_bldgs_single_delta23avg <- with(filter(data_2p,is.na(council_approval_norez)),
+                                                    rdrobust(y = total_bldgs_single_ln_delta23avg,x = demshare,
+                                                             c = 0.5,cluster = cluster
+                                                             # ,weights=weight
+                                                    ))
+fit_missingapproval_ratio_bldgs_multisingle_delta23avg <- with(filter(data_2p,is.na(council_approval_norez)),
+                                                               rdrobust(y = ratio_bldgs_multisingle_delta23avg,x = demshare,
+                                                                        c = 0.5,cluster = cluster
+                                                                        # ,weights=weight
+                                                               ))
+
+fit_missingapproval_ratio_units_multisingle_delta23avg <- with(filter(data_2p,is.na(council_approval_norez)),
+                                                               rdrobust(y = ratio_units_multisingle_delta23avg,x = demshare,
+                                                                        c = 0.5, cluster = cluster
+                                                                        # ,weights=weight
+                                                               ))
+
+coefs <- rd.export.numeric.90(list(
+  fit_approval_ratio_bldgs_multisingle_delta23avg,
+  fit_approval_ratio_units_multisingle_delta23avg,
+  fit_noapproval_ratio_bldgs_multisingle_delta23avg,
+  fit_noapproval_ratio_units_multisingle_delta23avg,
+  fit_missingapproval_ratio_bldgs_multisingle_delta23avg,
+  fit_missingapproval_ratio_units_multisingle_delta23avg
+)) %>%
+  mutate(approval = c(rep("Yes",2),rep("No",2),rep("Missing",2)))
+
+coefs$outcome_pretty = rep(c("Multi-family proportion\nof total buildings",
+                             "Multi-family proportion\nof total units"), 3)
+coefs <- coefs %>%
+  mutate(plotorder = c(2:1,2:1,2:1))
+
+
+pdf("mayors/coefplot_cbps_deltaratios_byapproval_color_wmissing.pdf",height=3,width=5)
+ggplot(coefs,aes(group=approval)) +
+  geom_hline(yintercept=0, lty=2, lwd=1, colour="grey50") +
+  geom_errorbar(aes(x=plotorder,ymin=cilo, ymax=cihi,col=approval),position=position_dodge(width=0.6), width=0, size=0.75) +
+  geom_errorbar(aes(x=plotorder,ymin=cilo_90, ymax=cihi_90,col=approval),position=position_dodge(width=0.6), width=0, size=1.5) +
+  geom_point(aes(x=plotorder,y=coef,shape=approval,fill=approval),position=position_dodge(width=0.6),size=4) +
+  geom_text(aes(x=plotorder+0.06,y=coef+0.03,label=round(coef,2)),position=position_dodge(width=0.6), size=3) +
+  scale_y_continuous("RD effect on change in outcome between\nelection year and avg. of 2/3 years after election",
+                     breaks=seq(-1, 1, 0.1),
+                     limits=c(min(coefs$cilo),
+                              max(coefs$cihi)),
+                     labels=seq(-1, 1, 0.1)) +
+  scale_x_continuous("Outcome",
+                     breaks=c(coefs$plotorder),
+                     limits=c(0.7,2.3),
+                     labels=coefs$outcome_pretty,position = "bottom") + 
+  scale_shape_manual("Council approval\nneeded?",values = c(21,22,23),breaks = c("Yes","No","Missing"),labels=c("Requires\nmajority","Does\nnot","Missing")) + 
+  scale_color_manual("Council approval\nneeded?",breaks=c("Yes","No","Missing"),labels=c("Requires\nmajority","Does\nnot","Missing"),values=c(vpurple,vgreen,vyellow),aesthetics = c("col","fill")) + 
+  coord_flip() + 
+  theme_minimal() + 
+  theme(legend.position = c(0.22,0.85),legend.text = element_text(size=6),legend.title = element_text(size=7),legend.justification = "top")
+dev.off()
+```
+##with missing data##
+```{r}
+data_2p <- read_rds(file = "data_mayors_2p_post1990_missing.rds")
+
+data_2p <- data_2p %>%
+  rowwise() %>%
+  mutate(
+    total_units_lead23avg = mean(c(total_units_lead2, total_units_lead3), na.rm=T),
+    total_units_multi_ln_lead23avg = mean(c(total_units_multi_ln_lead2, total_units_multi_ln_lead3), na.rm=T),
+    total_units_multi_pc_lead23avg = mean(c(total_units_multi_pc_lead2, total_units_multi_pc_lead3), na.rm=T)
+  )
+
+fit_missingapproval_units_delta23avg <- with(filter(data_2p,is.na(council_approval_norez)),
+                                             rdrobust(y = total_units_ln_delta23avg,x = demshare,
+                                                      c = 0.5,cluster = cluster
+                                                      #, weights=weight
+                                             ))
+fit_missingapproval_bldgs_delta23avg <- with(filter(data_2p,is.na(council_approval_norez)),
+                                             rdrobust(y = total_bldgs_ln_delta23avg,x = demshare,
+                                                      c = 0.5,cluster = cluster
+                                                      #,weights=weight
+                                             ))
+
+fit_missingapproval_units_multi_delta23avg <- with(filter(data_2p,is.na(council_approval_norez)),
+                                                   rdrobust(y = total_units_multi_ln_delta23avg,x = demshare,
+                                                            c = 0.5,cluster = cluster
+                                                            # ,weights=weight
+                                                   ))
+fit_missingapproval_bldgs_multi_delta23avg <- with(filter(data_2p,is.na(council_approval_norez)),
+                                                   rdrobust(y = total_bldgs_multi_ln_delta23avg,x = demshare,
+                                                            c = 0.5,cluster = cluster
+                                                            # ,weights=weight
+                                                   ))
+fit_missingapproval_units_single_delta23avg <- with(filter(data_2p,is.na(council_approval_norez)),
+                                                    rdrobust(y = total_units_single_ln_delta23avg,x = demshare,
+                                                             c = 0.5,cluster = cluster
+                                                             # ,weights=weight
+                                                    ))
+fit_missingapproval_bldgs_single_delta23avg <- with(filter(data_2p,is.na(council_approval_norez)),
+                                                    rdrobust(y = total_bldgs_single_ln_delta23avg,x = demshare,
+                                                             c = 0.5,cluster = cluster
+                                                             # ,weights=weight
+                                                    ))
+fit_missingapproval_ratio_bldgs_multisingle_delta23avg <- with(filter(data_2p,is.na(council_approval_norez)),
+                                                               rdrobust(y = ratio_bldgs_multisingle_delta23avg,x = demshare,
+                                                                        c = 0.5,cluster = cluster
+                                                                        # ,weights=weight
+                                                               ))
+
+fit_missingapproval_ratio_units_multisingle_delta23avg <- with(filter(data_2p,is.na(council_approval_norez)),
+                                                               rdrobust(y = ratio_units_multisingle_delta23avg,x = demshare,
+                                                                        c = 0.5, cluster = cluster
+                                                                        # ,weights=weight
+                                                               ))
+
+coefs <- rd.export.numeric.90(list(
+  fit_approval_ratio_bldgs_multisingle_delta23avg,
+  fit_approval_ratio_units_multisingle_delta23avg,
+  fit_noapproval_ratio_bldgs_multisingle_delta23avg,
+  fit_noapproval_ratio_units_multisingle_delta23avg,
+  fit_missingapproval_ratio_bldgs_multisingle_delta23avg,
+  fit_missingapproval_ratio_units_multisingle_delta23avg
+)) %>%
+  mutate(approval = c(rep("Yes",2),rep("No",2),rep("Missing",2)))
+
+coefs$outcome_pretty = rep(c("Multi-family proportion\nof total buildings",
+                             "Multi-family proportion\nof total units"), 3)
+coefs <- coefs %>%
+  mutate(plotorder = c(2:1,2:1,2:1))
+
+
+pdf("mayors/coefplot_cbps_deltaratios_byapproval_color_wmissing.pdf",height=3,width=5)
+ggplot(coefs,aes(group=approval)) +
+  geom_hline(yintercept=0, lty=2, lwd=1, colour="grey50") +
+  geom_errorbar(aes(x=plotorder,ymin=cilo, ymax=cihi,col=approval),position=position_dodge(width=0.6), width=0, size=0.75) +
+  geom_errorbar(aes(x=plotorder,ymin=cilo_90, ymax=cihi_90,col=approval),position=position_dodge(width=0.6), width=0, size=1.5) +
+  geom_point(aes(x=plotorder,y=coef,shape=approval,fill=approval),position=position_dodge(width=0.6),size=4) +
+  geom_text(aes(x=plotorder+0.06,y=coef+0.03,label=round(coef,2)),position=position_dodge(width=0.6), size=3) +
+  scale_y_continuous("RD effect on change in outcome between\nelection year and avg. of 2/3 years after election",
+                     breaks=seq(-1, 1, 0.1),
+                     limits=c(min(coefs$cilo),
+                              max(coefs$cihi)),
+                     labels=seq(-1, 1, 0.1)) +
+  scale_x_continuous("Outcome",
+                     breaks=c(coefs$plotorder),
+                     limits=c(0.7,2.3),
+                     labels=coefs$outcome_pretty,position = "bottom") + 
+  scale_shape_manual("Council approval\nneeded?",values = c(21,22,23),breaks = c("Yes","No","Missing"),labels=c("Requires\nmajority","Does\nnot","Missing")) + 
+  scale_color_manual("Council approval\nneeded?",breaks=c("Yes","No","Missing"),labels=c("Requires\nmajority","Does\nnot","Missing"),values=c(vpurple,vgreen,vyellow),aesthetics = c("col","fill")) + 
+  coord_flip() + 
+  theme_minimal() + 
+  theme(legend.position = c(0.22,0.85),legend.text = element_text(size=6),legend.title = element_text(size=7),legend.justification = "top")
+dev.off()
+```
