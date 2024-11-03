@@ -334,7 +334,6 @@ stargazer(mc.rd.mayors,
 ggsave(mccrary_mayors,filename = "mayors/mccrary_hist.pdf",height=3,width=4)
 
 
-## Using Cattaneo Jansson and Ma (2019) nonparametric method:
 cjm_mayors <- with(data_2p, rddensity(X=demshare,c=0.5,massPoints = F,h = fit_ratio_units_multisingle_delta23avg$bws["h", "left"]))
 summary(cjm_mayors)
 
@@ -346,7 +345,6 @@ cjm_mayors$N$eff_left + cjm_mayors$N$eff_right # effective N
 cjm_mayors$h$left
 cjm_mayors$h$right
 
-## Table A4b:
 density_tab <- data.frame(
   "t-statistic" = c(cjm_mayors$test$t_jk),
   "p-value" = c(cjm_mayors$test$p_jk),
@@ -359,7 +357,6 @@ density_tab <- data.frame(
 print(xtable(density_tab),file = "mayors/rddensity_cjm.tex",floating = F,include.rownames = F)
 
 
-## For RDD Density test using Hartman (2020) method (null hypothesis of difference)
 devtools::source_url("https://github.com/ekhartman/rdd_equivalence/blob/master/RDD_equivalence_functions.R?raw=TRUE")
 fstar_mayors <- cjm_mayors$hat$left/cjm_mayors$hat$right # f-star-hat
 hartman_mayors <- rdd.tost.ratio(estL = cjm_mayors$hat$left, estR = cjm_mayors$hat$right,
@@ -367,7 +364,6 @@ hartman_mayors <- rdd.tost.ratio(estL = cjm_mayors$hat$left, estR = cjm_mayors$h
                                  eps = 1.5,
                                  alpha = 0.05)
 
-## Table A5b:
 hartman_tab <- data.frame("Observed Ratio" = c(fstar_mayors),
                           "Equivalence Confidence Interval" = c(paste0("(",round(1/hartman_mayors$inverted,2), ", ",round(hartman_mayors$inverted,2),")")),
                           "p-value" = c(hartman_mayors$p)
